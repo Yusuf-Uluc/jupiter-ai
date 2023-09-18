@@ -6,8 +6,6 @@ import { getBalances } from "@/lib/utils";
 import { CHAT_QA_PROMPT, JSON_EXAMPLE, makeChain } from "@/lib/langchain";
 import path from "path";
 
-// export const runtime = "edge";
-
 export async function POST(req: Request) {
   const { messages, address } = await req.json();
   const prompt = (messages as Message[])[messages.length - 1].content;
