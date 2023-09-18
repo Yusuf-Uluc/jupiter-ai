@@ -2,7 +2,7 @@
 
 import { Message, useChat } from "ai/react";
 import { Skeleton } from "./ui/skeleton";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { ArrowRightLeft, PlayIcon } from "lucide-react";
 import {
@@ -15,7 +15,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { Button } from "./ui/button";
 import { useToast } from "./ui/use-toast";
-import { Swap } from "@/lib/langchain";
+import { AiResponse, Swap } from "@/lib/langchain";
 
 export default function Chat({}: {}) {
   const wallet = useWallet();
@@ -27,8 +27,34 @@ export default function Chat({}: {}) {
 
   const { toast } = useToast();
 
+  const [metadataForMsg, setMetadataForMsg] = useState<Record<string, Swap>>(
+    {}
+  );
+
+  const getMetadata = useCallback(
+    async (mintAccounts: string[]) => {
+      try {
+        const response = await fetch(`api/metadata`, {
+          method: "POST",
+          body: JSON.stringify({
+            mintAccounts: mintAccounts,
+            includeOffChain: true,
+          }),
+        });
+        const data = await response.json();
+        return data;
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: (err as any)?.message ?? (err as any),
+        });
+      }
+    },
+    [toast]
+  );
+
   const asSwap = (message: Message) => {
-    return JSON.parse(message.content) as Swap;
+    return JSON.parse(message.content) as AiResponse;
   };
 
   const getQuote = async (
@@ -71,11 +97,9 @@ export default function Chat({}: {}) {
   };
 
   const showSwapTx = useCallback(
-    async (message: Message) => {
+    async (swap: Swap) => {
       try {
-        if (wallet.publicKey && wallet.signTransaction) {
-          const swap = asSwap(message);
-
+        if (wallet.publicKey && wallet.signTransaction && swap) {
           const routes = await getQuote(
             swap.fromAddress,
             swap.toAddress,
@@ -108,10 +132,48 @@ export default function Chat({}: {}) {
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
 
-    if (messages.length > 0 && lastMessage.role === "assistant" && !isLoading) {
-      showSwapTx(lastMessage);
+    if (
+      messages.length > 0 &&
+      lastMessage.role === "assistant" &&
+      !isLoading &&
+      !metadataForMsg[lastMessage.id]
+    ) {
+      const swap = asSwap(lastMessage);
+      getMetadata([swap.fromAddress, swap.toAddress])
+        .then((metadata) => {
+          const fromIndex = 0;
+          const toIndex = 1;
+          setMetadataForMsg({
+            ...metadataForMsg,
+            [lastMessage.id]: {
+              fromAddress: swap.fromAddress,
+              toAddress: swap.toAddress,
+              inputTokenSwapAmount: swap.inputTokenSwapAmount,
+              fromDecimals:
+                metadata[fromIndex].onChainAccountInfo.accountInfo.data.parsed
+                  .info.decimals,
+              toDecimals:
+                metadata[toIndex].onChainAccountInfo.accountInfo.data.parsed
+                  .info.decimals,
+              fromName: metadata[fromIndex].onChainMetadata.metadata.data.name,
+              toName: metadata[toIndex].onChainMetadata.metadata.data.name,
+              fromLogoURI:
+                metadata[fromIndex].offChainMetadata?.metadata?.image ??
+                metadata[fromIndex].legacyMetadata.logoURI,
+              toLogoURI:
+                metadata[toIndex].offChainMetadata?.metadata?.image ??
+                metadata[toIndex].legacyMetadata.logoURI,
+              fromSymbol:
+                metadata[fromIndex].onChainMetadata.metadata.data.symbol,
+              toSymbol: metadata[toIndex].onChainMetadata.metadata.data.symbol,
+            } as Swap,
+          });
+        })
+        .then(() => {
+          showSwapTx(metadataForMsg[lastMessage.id]);
+        });
     }
-  }, [messages, isLoading, showSwapTx]);
+  }, [messages, isLoading, showSwapTx, metadataForMsg, getMetadata]);
 
   return (
     <TooltipProvider>
@@ -133,32 +195,32 @@ export default function Chat({}: {}) {
                 <div>{message.content}</div>
               </div>
             ) : (
-              !isLoading && (
+              metadataForMsg[message.id] && (
                 <div key={message.id} className="flex flex-row space-x-1">
                   <div className="w-[250px] py-4 space-x-10 relative flex flex-row items-center justify-center border border-white/10 rounded-lg">
                     <Tooltip delayDuration={200}>
                       <TooltipTrigger>
                         <div className="flex flex-col space-y-1.5">
                           <Image
-                            src={asSwap(message).fromLogoURI}
+                            src={metadataForMsg[message.id].fromLogoURI}
                             alt=""
                             width={32}
                             height={32}
                             className="rounded-full"
                           />
                           <p className="text-xs text-white/70">
-                            {asSwap(message).fromSymbol}
+                            {metadataForMsg[message.id].fromSymbol}
                           </p>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent align="center">
-                        <p>{asSwap(message).fromName}</p>
+                        <p>{metadataForMsg[message.id].fromName}</p>
                       </TooltipContent>
                     </Tooltip>
                     <div className="flex flex-col items-center space-y-1">
                       <p className="text-green-500 text-xs">
-                        {asSwap(message).inputTokenSwapAmount}{" "}
-                        {asSwap(message).fromSymbol}
+                        {metadataForMsg[message.id].inputTokenSwapAmount}{" "}
+                        {metadataForMsg[message.id].fromSymbol}
                       </p>
                       <ArrowRightLeft size={20} color="#E1E1E1" />
                     </div>
@@ -166,26 +228,26 @@ export default function Chat({}: {}) {
                       <TooltipTrigger>
                         <div className="flex flex-col space-y-1.5">
                           <Image
-                            src={asSwap(message).toLogoURI}
+                            src={metadataForMsg[message.id].toLogoURI}
                             alt=""
                             width={32}
                             height={32}
                             className="rounded-full"
                           />
                           <p className="text-xs text-white/70">
-                            {asSwap(message).toSymbol}
+                            {metadataForMsg[message.id].toSymbol}
                           </p>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent align="end">
-                        <p>{asSwap(message).toName}</p>
+                        <p>{metadataForMsg[message.id].toName}</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
                   <Button
                     variant="ghost"
                     className="w-6 h-6 p-0 border border-white/10"
-                    onClick={() => showSwapTx(message)}
+                    onClick={() => showSwapTx(metadataForMsg[message.id])}
                   >
                     <PlayIcon size={8} className="text-green-400" />
                   </Button>
@@ -194,7 +256,9 @@ export default function Chat({}: {}) {
             )
           )
         )}
-        {isLoading && <Skeleton className="w-[250px] h-[88px] rounded-lg" />}
+        {isLoading && (
+          <Skeleton className="w-[250px] h-[88px] rounded-lg brightness-50" />
+        )}
       </div>
     </TooltipProvider>
   );

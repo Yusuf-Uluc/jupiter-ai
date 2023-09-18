@@ -16,6 +16,12 @@ export interface Token {
   };
 }
 
+export interface AiResponse {
+  inputTokenSwapAmount: number;
+  fromAddress: string;
+  toAddress: string;
+}
+
 export interface Swap {
   fromAddress: string;
   toAddress: string;
@@ -95,13 +101,5 @@ export const CHAT_QA_PROMPT = PromptTemplate.fromTemplate(`
 export const JSON_EXAMPLE = JSON.stringify({
   fromAddress: "So11111111111111111111111111111111111111112",
   toAddress: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  fromDecimals: 9,
-  toDecimals: 6,
-  fromLogoURI: "https://example.com/logo.png",
-  toLogoURI: "https://example.com/logo.png",
-  fromSymbol: "SOL",
-  toSymbol: "USDC",
-  fromName: "Solana",
-  toName: "USD Coin",
   inputTokenSwapAmount: 100,
-} as Swap);
+} as AiResponse);
