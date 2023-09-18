@@ -29,7 +29,10 @@ export async function POST(req: Request) {
     ],
   };
   if (balances.tokens.length > 0 || balances.nativeBalance > 0) {
-    const store = await HNSWLib.load("TODO", new OpenAIEmbeddings());
+    const store = await HNSWLib.load(
+      path.join(process.cwd(), "tokens"),
+      new OpenAIEmbeddings()
+    );
 
     const filter = (doc: Document) => {
       if (
@@ -37,10 +40,6 @@ export async function POST(req: Request) {
           (t) => t.mint === JSON.parse(doc.pageContent).address
         )
       ) {
-        console.log({
-          name: JSON.parse(doc.pageContent).name,
-          address: JSON.parse(doc.pageContent).address,
-        });
         return true;
       }
       return false;

@@ -30,11 +30,7 @@ export interface Swap {
   inputTokenSwapAmount: number;
 }
 
-export const makeChain = (
-  // vectorstore: HNSWLib,
-  QA_PROMPT: PromptTemplate
-  // filter: (doc: Document) => boolean
-) => {
+export const makeChain = (QA_PROMPT: PromptTemplate) => {
   const model = new OpenAIChat({
     temperature: 0,
     frequencyPenalty: 0,
@@ -47,8 +43,6 @@ export const makeChain = (
       },
     } as any,
   });
-
-  console.log("GOT HERE");
 
   const chain = new ConversationChain({
     llm: model,

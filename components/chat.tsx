@@ -96,7 +96,6 @@ export default function Chat({}: {}) {
           await wallet.signTransaction(transaction);
         }
       } catch (err) {
-        console.log(err);
         toast({
           title: "Error",
           description: (err as any)?.message ?? (err as any),

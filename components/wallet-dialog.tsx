@@ -26,9 +26,6 @@ export default function WalletDialog() {
 
   const connectWallet = async (name: WalletName) => {
     select(name);
-    // connect().catch((err) => {
-    //   console.log(err);
-    // });
   };
 
   useEffect(() => {
